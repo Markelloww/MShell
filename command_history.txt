@@ -1,0 +1,8 @@
+asd
+/e
+\e
+\e das
+\e ADMIN
+\e PATH
+close
+exit
