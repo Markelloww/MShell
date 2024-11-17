@@ -1,4 +1,4 @@
-# Install script for directory: /Users/iitzx1srol/Desktop/my_shell
+# Install script for directory: /Users/iitzx1srol/Desktop/MShell
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -45,5 +45,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/Users/iitzx1srol/Desktop/my_shell/cmake-build-debug/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/Users/iitzx1srol/Desktop/MShell/cmake-build-debug/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

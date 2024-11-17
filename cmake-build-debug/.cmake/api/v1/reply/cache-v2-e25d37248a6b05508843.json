@@ -55,7 +55,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "/Users/iitzx1srol/Desktop/my_shell/cmake-build-debug"
+			"value" : "/Users/iitzx1srol/Desktop/MShell/cmake-build-debug"
 		},
 		{
 			"name" : "CMAKE_CACHE_MAJOR_VERSION",
@@ -383,7 +383,7 @@
 				}
 			],
 			"type" : "STATIC",
-			"value" : "/Users/iitzx1srol/Desktop/my_shell/cmake-build-debug/CMakeFiles/pkgRedirects"
+			"value" : "/Users/iitzx1srol/Desktop/MShell/cmake-build-debug/CMakeFiles/pkgRedirects"
 		},
 		{
 			"name" : "CMAKE_GENERATOR",
@@ -443,7 +443,7 @@
 				}
 			],
 			"type" : "INTERNAL",
-			"value" : "/Users/iitzx1srol/Desktop/my_shell"
+			"value" : "/Users/iitzx1srol/Desktop/MShell"
 		},
 		{
 			"name" : "CMAKE_INSTALL_NAME_TOOL",
@@ -1015,7 +1015,7 @@
 				}
 			],
 			"type" : "STATIC",
-			"value" : "/Users/iitzx1srol/Desktop/my_shell/cmake-build-debug"
+			"value" : "/Users/iitzx1srol/Desktop/MShell/cmake-build-debug"
 		},
 		{
 			"name" : "my_shell_IS_TOP_LEVEL",
@@ -1039,7 +1039,7 @@
 				}
 			],
 			"type" : "STATIC",
-			"value" : "/Users/iitzx1srol/Desktop/my_shell"
+			"value" : "/Users/iitzx1srol/Desktop/MShell"
 		}
 	],
 	"kind" : "cache",
