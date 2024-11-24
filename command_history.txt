@@ -1,3 +1,2 @@
-\cron
-echo "* * * * * echo 'Hello, World!' >> /tmp/cron_test.log" | crontab -
+!kill -HUP 94314
 exit

@@ -3,113 +3,92 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <signal.h>
-#include <mach/mach.h>
 
 #define MAX_HISTORY 100 // Число команд (с конца), которые будут записаны в файл
 #define HISTORY_FILE "command_history.txt" // Название файла для хранения истории
 
-
-void sighup_handler(int sig) { // Обработчик сигнала SIGHUP
+/*
+ * (9) По сигналу SIGHUP вывести "Configuration reloaded"
+ */
+void sighup() {
+    signal(SIGHUP, sighup);
     printf("Configuration reloaded\n");
-    fflush(stdout);
-}
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <mach/mach.h>
-
-void dump_process_memory(pid_t pid) {
-    char filename[256];
-    snprintf(filename, sizeof(filename), "dump_%d.bin", pid);
-
-    // Получение task-порта для процесса
-    mach_port_t task;
-    kern_return_t kr = task_for_pid(mach_task_self(), pid, &task);
-    if (kr != KERN_SUCCESS) {
-        fprintf(stderr, "Error: Failed to access process %d (task_for_pid: %s)\n", pid, mach_error_string(kr));
-        return;
-    }
-
-    FILE *fp = fopen(filename, "wb");
-    if (!fp) {
-        perror("Error: Could not create dump file");
-        return;
-    }
-
-    // Чтение регионов памяти процесса
-    vm_address_t address = 0; // Начало чтения с нулевого адреса
-    vm_size_t size;
-    vm_region_basic_info_data_t info;
-    mach_msg_type_number_t info_count = VM_REGION_BASIC_INFO_COUNT;
-    mach_port_t object_name;
-
-    while (1) {
-        info_count = VM_REGION_BASIC_INFO_COUNT;
-        kr = vm_region(task, &address, &size, VM_REGION_BASIC_INFO,
-                       (vm_region_info_t)&info, &info_count, &object_name);
-        if (kr != KERN_SUCCESS) {
-            break;
-        }
-
-        // Выделение буфера для чтения
-        void *buffer = malloc(size);
-        if (!buffer) {
-            fprintf(stderr, "Error: Could not allocate memory for buffer\n");
-            break;
-        }
-
-        mach_msg_type_number_t read_bytes = 0;
-        kr = vm_read_overwrite(task, address, size, (vm_address_t)buffer, &read_bytes);
-        if (kr == KERN_SUCCESS) {
-            fwrite(buffer, 1, read_bytes, fp);
-        } else {
-            fprintf(stderr, "Error reading memory at address 0x%lx: %s\n", (unsigned long)address, mach_error_string(kr));
-        }
-
-        free(buffer);
-
-        // Переход к следующему региону
-        address += size;
-    }
-
-    fclose(fp);
-    printf("Memory dump saved to %s\n", filename);
 }
 
 int main() {
-    signal(SIGHUP, sighup_handler);
+    signal(SIGHUP, sighup);
 
-    char input[100];
+    char input[100]; // Введенная строка с клавиатуры
+
     char history[MAX_HISTORY][100];
     int history_index = 0;
-    int commands_stored = 0; // Количество сохранённых команд
+    int commands_stored = 0;
 
     while (1) {
-        printf("$ ");
-        fflush(stdout); // Запись буфера вывода в консоль
-        if (fgets(input, 100, stdin) == NULL) { // Проверка на ошибку
+
+        /*
+         * (1) + (2) Печатает введенную строку в цикле.
+         */
+        printf("> ");
+
+        /*
+         * Используем fflush для корректного вызова printf.
+         */
+        fflush(stdout);
+
+        /*
+         * (2) Выходим из цикла по Ctrl+D
+         * Читаем введенную строку с клавиатуры и записываем ее в input.
+         * Максимальный размер строки равен 100.
+         * Если чтение было успешным, то указатель пойдет на начало строки,
+         * иначе будет равен NULL, тогда программа завершится.
+         */
+        if (fgets(input, 100, stdin) == NULL) {
             break;
         }
 
+        /*
+         * Из полученной пользователем строки удаляем \n.
+         * Т.е. длина будет уменьшена на единицу.
+         */
         unsigned long n = strlen(input);
-        input[n - 1] = '\0'; // Удаление символа новой строки
+        input[n - 1] = '\0';
 
-        // Сохранение команды в историю
+        /*
+         * (4) Здесь происходит обработка истории введенных пользователем команд.
+         * История будет хранить последние MAX_HISTORY команд,
+         * и если количество команд превышает MAX_HISTORY,
+         * то новые команды будут перезаписывать старые команды в истории.
+         */
         strcpy(history[history_index % MAX_HISTORY], input);
         history_index++;
         if (commands_stored < MAX_HISTORY) {
             commands_stored++;
         }
 
-        if (strncmp(input, "echo", 4) == 0) { // Обработка команды echo
+        /*
+         * (3) Обрабатываем команды выхода exit и \q.
+         */
+        if (strcmp(input, "exit") == 0 || strcmp(input, "\\q") == 0) {
+            break;
+        }
+
+        /*
+         * (5) Обрабатываем команду echo.
+         * strncmp берет из input 4 символа и если они равны "echo",
+         * то возвращает 0 => printf выведет в консоль оставшиеся введенные символы.
+         */
+        else if (strncmp(input, "echo", 4) == 0) {
             printf("%s\n", input + 5);
             continue;
         }
-        else if (strncmp(input, "\\e", 2) == 0) { // Обработка команды вывода переменной окружения \e
+
+        /*
+         * (7) Обработка команды вывода переменной окружения \e.
+         */
+        else if (strncmp(input, "\\e", 2) == 0) {
             char * var_name = input + 3; // Получаем имя переменной окружения
-            char * value = getenv(var_name);
+            char * value = getenv(var_name); // Получаем значение, если еге нет, то вернет NULL
             if (value != NULL) {
                 printf("%s\n", value);
             }
@@ -118,19 +97,28 @@ int main() {
             }
             continue;
         }
-        else if (strcmp(input, "exit") == 0 || strcmp(input, "\\q") == 0) { // Обработка команд exit и \q
-            break;
-        }
-        else if (input[0] == '!') { // Обработка команды выполнения бинарного файла
+
+        /*
+         * (8) Выполняем указанный бинарник из /bin/ !
+         */
+        else if (strncmp(input, "!", 1) == 0) {
             char command[100];
-            strcpy(command, input + 1); // Копирование строки без первого символа
+            char * binary_file_name = input + 1; // Получаем имя двоичного файла
+            snprintf(command, sizeof(command), "/bin/%s", binary_file_name); // Формируем command
             int result = system(command);
-            printf("Return code: %d\n", result);
+            if (result != 0) {
+                printf("Error: Failed to run binary file %s\n", binary_file_name);
+            }
             continue;
         }
-        else if (strncmp(input, "\\l", 2) == 0) { // Обработка команды \l (macOS)
-            char *device = input + 3;
-            char command[150];
+
+        /*
+         * (10) Получаем информацию о разделе системы (для macOS) \l
+         */
+        else if (strncmp(input, "\\l", 2) == 0) {
+            char command[100];
+            char * device = input + 3; // Имя дискового устройства
+            // snprintf записывает строку в массив command с заменой %s на значение переменной device
             snprintf(command, sizeof(command), "diskutil list %s", device);
             int result = system(command);
             if (result != 0) {
@@ -138,9 +126,13 @@ int main() {
             }
             continue;
             /*
-             * На макосе нет sda, потому я проверял на \l /dev/disk0
+             * На macOS нет SDA, потому я проверял на \l /dev/disk0
              */
         }
+
+        /*
+         * (11) По \cron подключить VFS в /tmp/vfs со списком задач в планировщике
+         */
         else if (strcmp(input, "\\cron") == 0) { // Обработка команды \cron
             const char * vfs_dir = "/tmp/vfs";
             const char * tasks_file = "/tmp/vfs/tasks";
@@ -184,25 +176,18 @@ int main() {
             printf("Tasks saved to %s\n", tasks_file);
             continue;
         }
-        else if (strncmp(input, "\\mem", 4) == 0) {
-            char *pid_str = input + 5; // Получаем строку с PID
-            pid_t pid = atoi(pid_str);
 
-            if (pid <= 0) {
-                printf("Error: Invalid process ID '%s'\n", pid_str);
-                continue;
-            }
-
-            printf("Dumping memory of process %d...\n", pid);
-            dump_process_memory(pid);
-            continue;
-        }
-
+        /*
+         * (6) Если после проверки введенной команды она не будет найденной,
+         * то пользователь будет об этом уведомлен.
+         */
         printf("%s: command not found\n", input);
     }
 
-    // Запись истории в файл (история удаляется после повторной записи в файл)
-    FILE *fp = fopen(HISTORY_FILE, "w");
+    /*
+     * (4) Здесь происходит сохранение истории введенных команд в файл.
+     */
+    FILE * fp = fopen(HISTORY_FILE, "w");
     for (int i = 0; i < commands_stored; i++) {
         fprintf(fp, "%s\n", history[(history_index - commands_stored + i) % MAX_HISTORY]);
     }
