@@ -6,6 +6,7 @@
 
 #define MAX_HISTORY 100 // Число команд (с конца), которые будут записаны в файл
 #define HISTORY_FILE "command_history.txt" // Название файла для хранения истории
+#define MAX_ARGS 10 // Максимальное кол-во аргументов
 
 /*
  * (9) По сигналу SIGHUP вывести "Configuration reloaded"
@@ -99,45 +100,131 @@ int main() {
         }
 
         /*
-         * (8) Выполняем указанный бинарник из /bin/ !
+         * (8) Выполняем указанный бинарник из /bin/ по !
          */
         else if (strncmp(input, "!", 1) == 0) {
-            char command[100];
             char * binary_file_name = input + 1; // Получаем имя двоичного файла
-            snprintf(command, sizeof(command), "/bin/%s", binary_file_name); // Формируем command
-            int result = system(command);
-            if (result != 0) {
-                printf("Error: Failed to run binary file %s\n", binary_file_name);
+            char * args[MAX_ARGS]; // Массив для аргументов
+            int arg_count = 0; // Кол-во аргументов
+
+            // Разделяем строку на аргументы
+            char * token = strtok(binary_file_name, " ");
+            while (token != NULL && arg_count < MAX_ARGS - 1) {
+                args[arg_count++] = token;
+                token = strtok(NULL, " ");
             }
+            args[arg_count] = NULL; // Маркер конца
+
+            char command[100];
+            snprintf(command, sizeof(command), "/bin/%s", args[0]);
+
+            /*
+             * Создаем процесс.
+             * Если он равен -1, то он не был создан => выводим ошибку в терминал.
+             */
+            pid_t pid = fork();
+            if (pid == -1) {
+                perror("Error with fork");
+                continue;
+            }
+
+            /*
+             * Создаем дочерний процесс.
+             * Если execvp вернется, то значит произошла ошибка => выходим.
+             */
+            if (pid == 0) {
+                execvp(command, args);
+                perror("Error with exec");
+                exit(1);
+            }
+            /*
+             * Создаем родительский процесс.
+             * waitpid блокирует выполнение родительского процесса,
+             * пока дочерний процесс не завершится.
+             * С помощью макросов затем проверяем на выходные ошибки.
+             */
+            else {
+                int status;
+                waitpid(pid, & status, 0); // Ожидаем завершения дочернего процесса
+                if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+                    printf("Error: Failed to run binary file %s\n", args[0]);
+                }
+            }
+
             continue;
         }
 
         /*
          * (10) Получаем информацию о разделе системы (для macOS) \l
+         * На macOS нет SDA, потому я проверял на \l /dev/disk0
+         * Используем пайпы для перенаправления вывода команды из дочернего процесса родительскому.
          */
         else if (strncmp(input, "\\l", 2) == 0) {
-            char command[100];
-            char * device = input + 3; // Имя дискового устройства
-            // snprintf записывает строку в массив command с заменой %s на значение переменной device
-            snprintf(command, sizeof(command), "diskutil list %s", device);
-            int result = system(command);
-            if (result != 0) {
-                printf("Error: Failed to retrieve information for device %s\n", device);
-            }
-            continue;
+            char * device = input + 3;
+
             /*
-             * На macOS нет SDA, потому я проверял на \l /dev/disk0
+             * Создаем пайп для чтения вывода команды
+             *
+             * pipefd[0] дескриптор чтения
+             * pipefd[1] дескриптор записи
              */
+            int pipefd[2];
+            if (pipe(pipefd) == -1) {
+                perror("pipe");
+                continue;
+            }
+
+            pid_t pid = fork();
+            if (pid == -1) {
+                perror("fork");
+                continue;
+            }
+
+            if (pid == 0) {
+                close(pipefd[0]); //  Закрываем конец пайпа для чтения
+
+                // Перенаправляем стандартный вывод в пайп
+                dup2(pipefd[1], STDOUT_FILENO);
+                close(pipefd[1]);
+
+                char * args[] = {"diskutil", "list", device, NULL};
+
+                execvp(args[0], args);
+                perror("exec");
+                exit(1);
+            }
+            else {
+                close(pipefd[1]); // Закрываем конец пайпа для записи
+
+                int status;
+                waitpid(pid, &status, 0);
+
+                char buffer[256];
+                ssize_t bytesRead;
+                while ((bytesRead = read(pipefd[0], buffer, sizeof(buffer) - 1)) > 0) {
+                    buffer[bytesRead] = '\0'; // Добавляем нулевой символ для корректного вывода
+                    printf("%s", buffer); // Выводим данные
+                }
+
+                close(pipefd[0]); // Закрываем конец пайпа для чтения
+
+                if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+                    printf("Error: Failed to retrieve information for device %s\n", device);
+                }
+            }
+
+            continue;
         }
 
-        /*
-         * (11) По \cron подключить VFS в /tmp/vfs со списком задач в планировщике
-         */
+
+            /*
+             * (11) По \cron подключить VFS в /tmp/vfs со списком задач в планировщике
+             */
         else if (strcmp(input, "\\cron") == 0) { // Обработка команды \cron
             const char * vfs_dir = "/tmp/vfs";
             const char * tasks_file = "/tmp/vfs/tasks";
 
-            // Создаем виртуальную файловую систему (каталог /tmp/vfs)
+            // Создаем виртуальную файловую систему (кат алог /tmp/vfs)
             if (access(vfs_dir, F_OK) == -1) {
                 if (mkdir(vfs_dir, 0755) != 0) {
                     perror("Error creating VFS directory");
