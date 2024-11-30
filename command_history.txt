@@ -1,2 +1,3 @@
-!kill -HUP 94314
+\l 
+\l /dev/disk0
 exit
