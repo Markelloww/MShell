@@ -1,0 +1,51 @@
+# Executables
+mshell
+/tmp/shell-target
+*.exe
+*.out
+
+# Object files
+*.o
+*.obj
+
+# Command history
+command_history.txt
+
+# VFS directories
+/tmp/vfs/
+/tmp/mshell_*
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*~
+*.swo
+
+# Build directories
+cmake-build-*/
+build/
+dist/
+*.user
+
+# System files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Log files
+*.log
+debug.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Coverage reports
+*.gcda
+*.gcno
+*.gcov
+
+# Dependency files
+*.d
+
