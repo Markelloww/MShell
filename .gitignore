@@ -4,6 +4,11 @@ mshell
 *.exe
 *.out
 
+# MacOS
+.DS_Store
+*/._.DS_Store
+*.DS_Store
+
 # Object files
 *.o
 *.obj
